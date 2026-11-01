@@ -599,6 +599,11 @@
             border: 1px solid var(--border);
             border-radius: 16px;
             padding: var(--space-5);
+            /* Flex column so the quote/summary absorbs the slack that equal-
+               height stretching leaves behind, keeping the metadata row pinned
+               to the bottom of every card instead of pooling empty space. */
+            display: flex;
+            flex-direction: column;
         }
 
         /* ===== Testimonial carousel =====
@@ -854,6 +859,11 @@
             flex-wrap: wrap;
             font-size: var(--text-xs);
             color: var(--text-secondary);
+            /* Anchors the metadata row to the card bottom, so a short quote
+               leaves its breathing room above the row instead of pooling
+               empty space beneath it. */
+            margin-top: auto;
+            padding-top: var(--space-3);
         }
 
         .review-meta-dot {
@@ -1312,6 +1322,27 @@
                                 <blockquote class="review-quote">
                                     <p>“I like the idea behind Critique, especially the focus on helping builders improve their products through real feedback. I appreciate that you took my suggestions seriously and actually implemented improvements based on them. That kind of responsiveness makes a real difference. I'd definitely recommend Critique to other builders who want honest feedback and want to improve their products.”</p>
                                 </blockquote>
+                            </article>
+                        </li>
+
+                        <li class="fb-slide">
+                            <article class="review-card" aria-labelledby="review-peter-name">
+                                <div class="review-header">
+                                    <div class="review-author">
+                                        <div class="review-avatar" data-name="Peter" aria-hidden="true">P</div>
+                                        <div>
+                                            <h3 class="review-name" id="review-peter-name">Peter</h3>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <blockquote class="review-quote">
+                                    <p>Just tried Critique and left some feedback on a project. Noice concept, especally the focuse on specific question rether than generic revew.keep bui;ding</p>
+                                </blockquote>
+
+                                <div class="review-meta">
+                                    <span>Community feedback</span>
+                                </div>
                             </article>
                         </li>
                     </ul>
