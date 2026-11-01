@@ -4,12 +4,14 @@ The testimonial section (``<section class="real-feedback">``) was redesigned
 into a horizontal carousel with deterministic geometric identicons. These
 tests lock down the contract the redesign promised:
 
-1. All three testimonials (Josh Clark, Alex Lovesyuk, Dennis) remain present
-   with their exact wording, names, dates, metadata and tags.
+1. All four testimonials (Josh Clark, Alex Lovesyuk, Dennis, Peter) remain
+   present with their exact wording, names, dates, metadata and tags. The
+   first three keep their original wording verbatim; Peter's is reproduced
+   word-for-word with no invented fields.
 2. Three or fewer testimonials render without any carousel controls.
 3. Identicons are deterministic, symmetrical and fully local (SVG only).
-4. A fourth testimonial activates navigation, with one pagination dot per
-   page (pages = ceil(slides / per-view)).
+4. Four testimonials on desktop (3 per view) produce two pages, activating
+   navigation with one pagination dot per page (pages = ceil(slides/per-view)).
 5. Autoplay runs on a 5-6 second interval, wraps around, and honours the
    pause/play control plus hover, focus, touch and tab-visibility pauses.
 6. ``prefers-reduced-motion`` never autoplays.
@@ -114,16 +116,18 @@ STATE = {"evaluate": "CritiqueTestimonials.state()", "as": "state"}
 # ---------------------------------------------------------------------------
 
 
-def test_all_three_testimonials_keep_their_exact_wording_and_metadata():
+def test_all_four_testimonials_keep_their_exact_wording_and_metadata():
     src = source()
 
-    # All three testimonials (and only these) are present. Each name appears
+    # All four testimonials (and only these) are present. Each name appears
     # exactly twice: the visible heading and the avatar's identicon seed.
-    assert src.count('class="review-card"') == 3
+    assert src.count('class="review-card"') == 4
+    assert src.count('<li class="fb-slide">') == 4
     for ident, name in (
         ("review-josh-name", "Josh Clark"),
         ("review-alex-name", "Alex Lovesyuk"),
         ("review-dennis-name", "Dennis"),
+        ("review-peter-name", "Peter"),
     ):
         assert f'id="{ident}"' in src, f"missing heading for {name}"
         assert src.count(name) == 2, f"{name} must only be heading + data-name"
@@ -161,6 +165,26 @@ def test_all_three_testimonials_keep_their_exact_wording_and_metadata():
         "want honest feedback and want to improve their products.”"
     ) in src
 
+    # Peter: verbatim community feedback, no quotation marks added (his
+    # original carried none) and no invented surname, title, company, rating,
+    # date, tags or claims. The only metadata is the neutral label.
+    assert (
+        "Just tried Critique and left some feedback on a project. Noice "
+        "concept, especally the focuse on specific question rether than "
+        "generic revew.keep bui;ding"
+    ) in src
+    peter_card = src[src.index('id="review-peter-name"'):]
+    peter_card = peter_card[: peter_card.index("</article>")]
+    assert "<span>Community feedback</span>" in peter_card
+    # Truthfully omits every field we cannot supply: no role, no score, no
+    # date, no tags, no invented attribution beyond the first name.
+    assert "review-role" not in peter_card
+    assert "review-score" not in peter_card
+    assert "review-tag" not in peter_card
+    assert "review-meta-dot" not in peter_card
+    # Peter's card never gains a quotation mark the source feedback lacked.
+    assert "“" not in peter_card
+
 
 def test_section_markup_is_semantic_and_carousel_labelled():
     src = source()
@@ -174,7 +198,7 @@ def test_section_markup_is_semantic_and_carousel_labelled():
 
     # Semantic list structure for the slides.
     assert '<ul class="fb-track" id="fb-track" role="list">' in src
-    assert src.count('<li class="fb-slide">') == 3
+    assert src.count('<li class="fb-slide">') == 4
 
     # Real buttons with accessible names; controls start hidden.
     assert '<button type="button" class="fb-nav" id="fb-prev" aria-label="Previous testimonials">' in src
@@ -196,7 +220,12 @@ def test_section_markup_is_semantic_and_carousel_labelled():
 
     # Avatars map names to identicons; the letter initial is kept as the
     # graceful no-JavaScript fallback.
-    for name, initial in (("Josh Clark", "J"), ("Alex Lovesyuk", "A"), ("Dennis", "D")):
+    for name, initial in (
+        ("Josh Clark", "J"),
+        ("Alex Lovesyuk", "A"),
+        ("Dennis", "D"),
+        ("Peter", "P"),
+    ):
         assert (
             f'<div class="review-avatar" data-name="{name}" aria-hidden="true">{initial}</div>'
             in src
@@ -305,6 +334,31 @@ def test_fourth_testimonial_activates_navigation_and_pagination(tmp_path):
     assert dots.count('aria-current="true"') == 1
     assert 'class="fb-dot" data-page="0" aria-label' in dots
     assert 'aria-current="true"' in dots
+
+
+def test_four_real_slides_page_across_desktop_with_visible_controls(tmp_path):
+    """The shipped markup (4 slides) yields two desktop pages and controls.
+
+    Reads the real slide count out of the page source rather than a hard-coded
+    number, so the page math stays verified even if a fifth testimonial lands
+    later: desktop shows 3 per view, so controls must appear iff there is more
+    than one page.
+    """
+    real_slides = source().count('<li class="fb-slide">')
+    assert real_slides == 4, "homepage ships four testimonial slides"
+
+    result = run(tmp_path, "index.html", [add_slides(real_slides), STATE])
+    state = result["values"]["state"]
+
+    per_view = state["perView"]  # desktop default is 3
+    assert per_view == 3
+    expected_pages = -(-real_slides // per_view)  # ceil division
+    assert expected_pages == 2, "four cards over three-per-view is two pages"
+    assert state["pages"] == expected_pages
+    assert state["controlsVisible"] is (expected_pages > 1)
+    assert result["flags"]["fb-controls"]["hidden"] is False
+    # Pagination exposes exactly one dot per page.
+    assert result["ids"]["fb-dots"].count('class="fb-dot"') == expected_pages
 
 
 def test_navigation_wraps_and_pause_play_controls_autoplay(tmp_path):
@@ -433,10 +487,24 @@ def test_layout_matches_desktop_tablet_and_mobile():
     assert re.search(r"\.fb-track\s*\{[^}]*align-items:\s*stretch", src)
     assert re.search(r"\.fb-slide\s*\{[^}]*display:\s*flex", src)
 
+    # Balanced cards: the card is a flex column and the metadata row is
+    # anchored to the bottom, so a short quote leaves its breathing room
+    # above the row instead of pooling empty space beneath it.
+    assert re.search(
+        r"\.review-card\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column", src, re.S
+    ), "review card must be a flex column so short cards stay balanced"
+    assert re.search(
+        r"\.review-meta\s*\{[^}]*margin-top:\s*auto", src, re.S
+    ), "metadata must anchor to the card bottom"
+
     # Without JS the track wraps instead of clipping, so no testimonial is
-    # ever unreachable.
+    # ever unreachable. The enhanced viewport clips its own overflow, which is
+    # what keeps horizontal page overflow impossible.
     assert re.search(r"\.fb-track\s*\{[^}]*flex-wrap:\s*wrap", src)
     assert 'flex-wrap: nowrap' in src
+    assert re.search(
+        r'\.fb-carousel\[data-enhanced="true"\] \.fb-viewport\s*\{[^}]*overflow:\s*hidden', src, re.S
+    ), "the paged viewport must clip so cards never overflow the page"
 
 
 # ---------------------------------------------------------------------------
